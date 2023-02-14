@@ -89,6 +89,9 @@ import org.wfanet.measurement.api.v2alpha.eventGroup
 import org.wfanet.measurement.api.v2alpha.eventGroupMetadataDescriptor
 import org.wfanet.measurement.api.v2alpha.event_group_metadata.testing.TestMetadataMessage
 import org.wfanet.measurement.api.v2alpha.event_group_metadata.testing.TestMetadataMessageKt as TestMetadataMessages
+import org.wfanet.measurement.api.v2alpha.DeleteEventGroupRequest
+import org.wfanet.measurement.api.v2alpha.GetEventGroupRequest
+import org.wfanet.measurement.api.v2alpha.ListEventGroupsRequest
 import org.wfanet.measurement.api.v2alpha.event_group_metadata.testing.testMetadataMessage
 import org.wfanet.measurement.api.v2alpha.fulfillDirectRequisitionRequest
 import org.wfanet.measurement.api.v2alpha.fulfillRequisitionRequest
@@ -222,6 +225,83 @@ class EdpSimulator(
       }
     logger.info("Successfully created eventGroup ${eventGroup.name}...")
     return eventGroup
+  }
+
+  suspend fun createSimpleEventGroup(): EventGroup {
+    val measurementConsumer: MeasurementConsumer =
+      try {
+        measurementConsumersStub.getMeasurementConsumer(
+          getMeasurementConsumerRequest { name = measurementConsumerName }
+        )
+      } catch (e: StatusException) {
+        throw Exception("Error getting MeasurementConsumer $measurementConsumerName", e)
+      }
+
+    verifyEncryptionPublicKey(
+      measurementConsumer.publicKey,
+      getCertificate(measurementConsumer.certificate)
+    )
+
+    val request = createEventGroupRequest {
+      parent = edpData.name
+      eventGroup = eventGroup {
+        this.measurementConsumer = measurementConsumerName
+      }
+    }
+    val eventGroup =
+      try {
+        eventGroupsStub.createEventGroup(request)
+      } catch (e: StatusException) {
+        throw Exception("Error creating event group", e)
+      }
+    logger.info("Successfully created eventGroup ${eventGroup.name}...")
+    return eventGroup
+  }
+
+  suspend fun getEventGroup(request: GetEventGroupRequest): EventGroup {
+
+    val readEventGroup =
+      try {
+        eventGroupsStub.getEventGroup(request)
+      } catch (e: StatusException) {
+        throw Exception("Error retrieving event group", e)
+      }
+    logger.info("Successfully retrieved eventGroup ${readEventGroup.name}...")
+    return readEventGroup
+  }
+
+  suspend fun deleteEventGroup(request: DeleteEventGroupRequest): EventGroup {
+
+    val deletedEventGroup =
+      try {
+        eventGroupsStub.deleteEventGroup(request)
+      } catch (e: StatusException) {
+        throw Exception("Error deleting event group", e)
+      }
+    logger.info("Successfully deleted eventGroup ${deletedEventGroup.name}...")
+    return deletedEventGroup
+  }
+
+  suspend fun listEventGroup(showDeleted: Boolean): List<EventGroup> {
+
+    val eventGroups: List<EventGroup> =
+      try {
+        eventGroupsStub.listEventGroups(
+          ListEventGroupsRequest
+              .newBuilder()
+              .also {
+                it.parent = edpData.name
+                it.showDeleted = showDeleted
+              }
+              .build()
+              )
+          .eventGroupsList
+          .toList()
+      } catch (e: StatusException) {
+        throw Exception("Error retrieving event groups", e)
+      }
+    logger.info("Successfully retrieved event groups")
+    return eventGroups
   }
 
   private data class Specifications(

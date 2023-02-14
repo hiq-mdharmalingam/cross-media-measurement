@@ -30,8 +30,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import org.wfanet.measurement.api.v2alpha.CertificatesGrpcKt.CertificatesCoroutineStub
+import org.wfanet.measurement.api.v2alpha.DeleteEventGroupRequest
 import org.wfanet.measurement.api.v2alpha.EventGroupMetadataDescriptorsGrpcKt.EventGroupMetadataDescriptorsCoroutineStub
 import org.wfanet.measurement.api.v2alpha.EventGroupsGrpcKt.EventGroupsCoroutineStub
+import org.wfanet.measurement.api.v2alpha.GetEventGroupRequest
 import org.wfanet.measurement.api.v2alpha.MeasurementConsumersGrpcKt.MeasurementConsumersCoroutineStub
 import org.wfanet.measurement.api.v2alpha.RequisitionFulfillmentGrpcKt.RequisitionFulfillmentCoroutineStub
 import org.wfanet.measurement.api.v2alpha.RequisitionsGrpcKt.RequisitionsCoroutineStub
@@ -112,6 +114,14 @@ class InProcessEdpSimulator(
   }
 
   suspend fun createEventGroup() = delegate.createEventGroup()
+
+  suspend fun creatSimpleEventGroup() = delegate.createSimpleEventGroup()
+
+  suspend fun getEventGroup(request: GetEventGroupRequest) = delegate.getEventGroup(request)
+
+  suspend fun deleteEventGroup(request: DeleteEventGroupRequest) = delegate.deleteEventGroup(request)
+
+  suspend fun listDataProviderEventGroups(showDeleted: Boolean) = delegate.listEventGroup(showDeleted)
 
   /** Builds a [EdpData] object for the Edp with a certain [displayName] and [resourceName]. */
   private fun createEdpData(displayName: String, resourceName: String) =

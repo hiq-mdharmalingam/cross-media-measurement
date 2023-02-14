@@ -14,6 +14,8 @@
 
 package org.wfanet.measurement.integration.common
 
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.extensions.proto.ProtoTruth.assertThat
 import com.google.protobuf.ByteString
 import java.security.cert.X509Certificate
 import java.time.Duration
@@ -33,6 +35,9 @@ import org.wfanet.measurement.api.v2alpha.EventGroupsGrpcKt.EventGroupsCoroutine
 import org.wfanet.measurement.api.v2alpha.MeasurementConsumersGrpcKt.MeasurementConsumersCoroutineStub as PublicMeasurementConsumersCoroutineStub
 import org.wfanet.measurement.api.v2alpha.MeasurementsGrpcKt.MeasurementsCoroutineStub as PublicMeasurementsCoroutineStub
 import org.wfanet.measurement.api.v2alpha.RequisitionsGrpcKt.RequisitionsCoroutineStub as PublicRequisitionsCoroutineStub
+import kotlin.test.assertFailsWith
+import org.wfanet.measurement.api.v2alpha.DeleteEventGroupRequest
+import org.wfanet.measurement.api.v2alpha.GetEventGroupRequest
 import org.wfanet.measurement.api.v2alpha.differentialPrivacyParams
 import org.wfanet.measurement.common.crypto.subjectKeyIdentifier
 import org.wfanet.measurement.common.crypto.tink.TinkPrivateKeyHandle
@@ -271,6 +276,53 @@ abstract class InProcessLifeOfAMeasurementIntegrationTest {
       // Use frontend simulator to create an invalid reach and frequency measurement and verify
       // its error info.
       frontendSimulator.executeInvalidReachAndFrequency("1234")
+    }
+
+  @Test
+  fun `get and list eventGroups respect soft deleted eventGroups`() =
+    runBlocking {
+      val edpSimulator = edpSimulators[0]
+      val eventGroup1 = edpSimulator.creatSimpleEventGroup()
+      val deletedEventGroup1 = edpSimulator.deleteEventGroup(
+        DeleteEventGroupRequest
+          .newBuilder()
+          .also {
+            it.name = eventGroup1.name
+          }
+          .build()
+      )
+
+      val readEventGroup1 = edpSimulator.getEventGroup(
+        GetEventGroupRequest
+          .newBuilder()
+          .also {
+            it.name = eventGroup1.name
+            it.showDeleted = true
+          }
+          .build()
+      )
+
+      val exception =
+        assertFailsWith<Exception> {
+          edpSimulator.getEventGroup(
+            GetEventGroupRequest
+              .newBuilder()
+              .also {
+                it.name = eventGroup1.name
+                it.showDeleted = false
+              }
+              .build())
+          }
+      assertThat(readEventGroup1).isEqualTo(deletedEventGroup1)
+      assertThat(exception.message).isEqualTo("Error retrieving event group")
+
+      val eventGroup2 = edpSimulator.creatSimpleEventGroup()
+      val activeEventGroups = edpSimulator.listDataProviderEventGroups(showDeleted = false)
+      val allEventGroups = edpSimulator.listDataProviderEventGroups(showDeleted = true)
+
+      assertThat(activeEventGroups).hasSize(allEventGroups.size - 1)
+      assertThat(activeEventGroups).doesNotContain(deletedEventGroup1)
+      assertThat(activeEventGroups).contains(eventGroup2)
     }
 
   companion object {
